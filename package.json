@@ -1,0 +1,28 @@
+{
+  "name": "tooltrust",
+  "version": "0.0.0",
+  "description": "A public trust index for MCP servers and agent skills: continuous static and sandboxed checks, A-F grades, README badges, a JSON API and a CLI for CI allowlists..",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "Gagan Bhayana",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GaganBhayana/tooltrust.git"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test \"src/**/*.test.ts\"",
+    "check": "npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "typescript": "^5.9.0"
+  },
+  "private": true
+}
