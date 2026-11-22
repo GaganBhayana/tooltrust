@@ -5,7 +5,7 @@ Status values: `todo`, `review (PR #n)`, `done (PR #n)`, `blocked: <reason>`. Si
 ## M0 Foundation
 
 ### TT-001 Models for packages, tools and findings
-- Status: review
+- Status: done (PR #1)
 - Size: S
 - Depends on: none
 - Goal: `src/model.ts` with `PackageRef {ecosystem: npm|pypi|registry|skill, name, version}`, `ToolDef {name, description, inputSchema}`, `ServerManifest`, `SkillManifest`, and `Finding {ruleId, severity, message, evidence:{path?, excerpt, offset?}}`.
