@@ -1,2 +1,4 @@
-/** ToolTrust: Check the grade before you give an agent your keys. */
+/** ToolTrust: trust index for MCP servers and agent skills. */
 export const VERSION = '0.0.0';
+
+export * from './model.ts';
