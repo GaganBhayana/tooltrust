@@ -1,5 +1,8 @@
+/** Every ecosystem ToolTrust scans. */
+export const ECOSYSTEMS = ['npm', 'pypi', 'registry', 'skill'] as const;
+
 /** Where a scanned artefact comes from. */
-export type Ecosystem = 'npm' | 'pypi' | 'registry' | 'skill';
+export type Ecosystem = (typeof ECOSYSTEMS)[number];
 
 /** A specific version of a package, server or skill. */
 export interface PackageRef {
@@ -73,4 +76,25 @@ export function compareSeverity(a: Severity, b: Severity): number {
 /** A stable, human-readable id for a package version, such as `npm:@acme/mcp@1.2.0`. */
 export function refId(ref: PackageRef): string {
   return `${ref.ecosystem}:${ref.name}@${ref.version}`;
+}
+
+/** Why a ref id could not be parsed. */
+export type RefIdError = 'missing-ecosystem' | 'unknown-ecosystem' | 'missing-version' | 'missing-name';
+
+/**
+ * Parses an id produced by {@link refId}. Splits on the first `:` and the last `@`,
+ * so scoped npm names such as `@acme/x` keep their leading `@`.
+ */
+export function parseRefId(id: string): { ok: true; value: PackageRef } | { ok: false; error: RefIdError } {
+  const colon = id.indexOf(':');
+  if (colon <= 0) return { ok: false, error: 'missing-ecosystem' };
+  const ecosystem = id.slice(0, colon);
+  if (!(ECOSYSTEMS as readonly string[]).includes(ecosystem)) return { ok: false, error: 'unknown-ecosystem' };
+  const rest = id.slice(colon + 1);
+  const at = rest.lastIndexOf('@');
+  // An '@' at position 0 is an npm scope marker, not a version separator.
+  if (at <= 0 || at === rest.length - 1) return { ok: false, error: 'missing-version' };
+  const name = rest.slice(0, at);
+  if (name === '' || name === '@') return { ok: false, error: 'missing-name' };
+  return { ok: true, value: { ecosystem: ecosystem as Ecosystem, name, version: rest.slice(at + 1) } };
 }
