@@ -2,3 +2,4 @@
 export const VERSION = '0.0.0';
 
 export * from './model.ts';
+export * from './unicode/detect.ts';
