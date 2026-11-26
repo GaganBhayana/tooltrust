@@ -12,7 +12,7 @@ Status values: `todo`, `review (PR #n)`, `done (PR #n)`, `blocked: <reason>`. Si
 - Acceptance: exported types and fixture builders in `test/fixtures/`.
 
 ### TT-002 Unicode trickery detector
-- Status: review (PR #2)
+- Status: done (PR #2)
 - Size: M
 - Depends on: TT-001
 - Goal: `src/unicode/detect.ts` finds zero-width characters, Unicode tag characters (U+E0000–U+E007F), bidi overrides and isolates, homoglyph-mixed scripts in identifiers, and decodes tag-character payloads into readable text for the evidence.
