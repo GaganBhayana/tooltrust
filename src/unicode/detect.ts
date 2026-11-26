@@ -42,7 +42,13 @@ export const UNICODE_RULES: Readonly<Record<UnicodeTrick, { readonly id: string;
   },
 };
 
-const ZERO_WIDTH = new Set([0x180e, 0x200b, 0x200c, 0x200d, 0x2060, 0x2061, 0x2062, 0x2063, 0x2064, 0xfeff, 0x034f]);
+/**
+ * Zero-width characters, plus the Hangul fillers (U+115F, U+1160, U+3164, U+FFA0): those render
+ * as blank space but are letters, so they make invisible identifiers in source code.
+ */
+const ZERO_WIDTH = new Set([
+  0x180e, 0x200b, 0x200c, 0x200d, 0x2060, 0x2061, 0x2062, 0x2063, 0x2064, 0xfeff, 0x034f, 0x115f, 0x1160, 0x3164, 0xffa0,
+]);
 const ZWNJ = 0x200c;
 const ZWJ = 0x200d;
 const BOM = 0xfeff;
@@ -53,9 +59,12 @@ const BLACK_FLAG = 0x1f3f4;
 const isBidi = (cp: number): boolean => (cp >= 0x202a && cp <= 0x202e) || (cp >= 0x2066 && cp <= 0x2069);
 const isTag = (cp: number): boolean => cp >= TAG_FIRST && cp <= TAG_LAST;
 
-/** Scripts that use ZWNJ and ZWJ in normal writing, so joiners between their letters are fine. */
+/**
+ * Scripts that use ZWNJ and ZWJ in normal writing, so joiners between their letters are fine.
+ * Script_Extensions (not Script) so that shared combining marks, such as Arabic vowel signs, count.
+ */
 const JOINING_SCRIPT =
-  /[\p{Script=Arabic}\p{Script=Syriac}\p{Script=Devanagari}\p{Script=Bengali}\p{Script=Gurmukhi}\p{Script=Gujarati}\p{Script=Oriya}\p{Script=Tamil}\p{Script=Telugu}\p{Script=Kannada}\p{Script=Malayalam}\p{Script=Sinhala}]/u;
+  /[\p{scx=Arabic}\p{scx=Syriac}\p{scx=Devanagari}\p{scx=Bengali}\p{scx=Gurmukhi}\p{scx=Gujarati}\p{scx=Oriya}\p{scx=Tamil}\p{scx=Telugu}\p{scx=Kannada}\p{scx=Malayalam}\p{scx=Sinhala}]/u;
 const PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
 
 /**
@@ -115,7 +124,7 @@ export function unicodeFindings(text: string, path?: string): Finding[] {
   }));
 }
 
-/** Shows a string with every zero-width, tag and bidi control character spelled out as `<U+XXXX>`. */
+/** Shows a string with every invisible (zero-width or blank), tag and bidi control character spelled out as `<U+XXXX>`. */
 export function revealInvisible(text: string): string {
   return reveal(text, (ch, cp) => ZERO_WIDTH.has(cp) || isBidi(cp) || isTag(cp));
 }
@@ -238,7 +247,7 @@ function messageOf(hit: UnicodeHit): string {
   const where = `at line ${hit.line}, column ${hit.column}`;
   switch (hit.kind) {
     case 'tag-characters':
-      return `${hit.codePoints.length} invisible tag characters ${where} spell: ${JSON.stringify(hit.decoded ?? '')}`;
+      return `${hit.codePoints.length} invisible tag characters ${where} spell: ${shorten(hit.decoded ?? '')}`;
     case 'bidi-control':
       return `Bidirectional control characters ${hit.codePoints.join(' ')} ${where}`;
     case 'zero-width':
@@ -248,13 +257,31 @@ function messageOf(hit: UnicodeHit): string {
   }
 }
 
-const CONTEXT = 20;
+/** Longest decoded tag text quoted in a message; the full text stays on `UnicodeHit.decoded`. */
+const MAX_DECODED_IN_MESSAGE = 200;
 
-/** The hit with up to 20 characters either side, invisible characters spelled out. */
+/** Quotes decoded tag text, cut to {@link MAX_DECODED_IN_MESSAGE} characters with a note when longer. */
+function shorten(decoded: string): string {
+  if (decoded.length <= MAX_DECODED_IN_MESSAGE) return JSON.stringify(decoded);
+  return `${JSON.stringify(decoded.slice(0, MAX_DECODED_IN_MESSAGE))}… (${decoded.length} characters in all)`;
+}
+
+const CONTEXT = 20;
+/** Most UTF-16 units of the hit itself shown in an excerpt, so hostile input cannot make huge evidence. */
+const MAX_HIT_IN_EXCERPT = 40;
+
+/**
+ * The hit with up to 20 characters either side, invisible characters spelled out. A hit longer
+ * than {@link MAX_HIT_IN_EXCERPT} units is cut and marked with `…`.
+ */
 function excerpt(text: string, hit: UnicodeHit): string {
+  const hitEnd = hit.offset + hit.length;
   const start = safeIndex(text, Math.max(0, hit.offset - CONTEXT));
-  const end = safeIndex(text, Math.min(text.length, hit.offset + hit.length + CONTEXT));
-  return revealInvisible(text.slice(start, end)).replace(/\r\n?|\n/g, ' ');
+  const end = safeIndex(text, Math.min(text.length, hitEnd + CONTEXT));
+  const cut = hit.length > MAX_HIT_IN_EXCERPT ? safeIndex(text, hit.offset + MAX_HIT_IN_EXCERPT) : hitEnd;
+  const shown =
+    cut < hitEnd ? `${text.slice(start, cut)}…${text.slice(hitEnd, end)}` : text.slice(start, end);
+  return revealInvisible(shown).replace(/\r\n?|\n/g, ' ');
 }
 
 /** Moves an index off the low half of a surrogate pair so slicing never splits one. */

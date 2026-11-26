@@ -34,6 +34,7 @@ test('a byte-order mark is fine at offset 0 only', () => {
 test('joiners in emoji sequences and joining scripts are not reported', () => {
   assert.deepEqual(kinds(samples.emojiZwj), []);
   assert.deepEqual(kinds(samples.persianZwnj), []);
+  assert.deepEqual(kinds(samples.persianZwnjAfterMark), []);
   assert.deepEqual(kinds('a\u200Db'), ['zero-width']);
   assert.deepEqual(kinds('\u200D'), ['zero-width']);
 });
@@ -61,6 +62,26 @@ test('emoji subdivision flags are not reported, but tags after other emoji are',
   assert.deepEqual(kinds(samples.scotlandFlag), []);
   assert.deepEqual(kinds(`\u{1F600}${samples.toTags('gbsct')}\u{E007F}`), ['tag-characters']);
   assert.deepEqual(kinds(`\u{1F3F4}${samples.toTags('run rm -rf')}\u{E007F}`), ['tag-characters']);
+});
+
+test('a tag payload straight after a valid flag is still reported', () => {
+  // Flag of Scotland (black flag, tags "gbsct", cancel tag), then more tags with no gap.
+  const text = `Made in \u{1F3F4}${samples.toTags('gbsct')}\u{E007F}${samples.toTags('exfiltrate')}`;
+  const hits = detectUnicode(text);
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0]?.kind, 'tag-characters');
+  assert.equal(hits[0]?.decoded, 'gbsctexfiltrate');
+  assert.equal(hits[0]?.offset, 'Made in \u{1F3F4}'.length);
+});
+
+test('Hangul fillers used as invisible identifiers are reported', () => {
+  const [hit, ...rest] = detectUnicode(samples.hangulFillerIdentifier);
+  assert.equal(rest.length, 0);
+  assert.equal(hit?.kind, 'zero-width');
+  assert.deepEqual(hit?.codePoints, ['U+3164']);
+  assert.deepEqual([hit?.offset, hit?.column], [6, 7]);
+  assert.deepEqual(kinds('a\uFFA0b \u115F\u1160'), ['zero-width', 'zero-width']);
+  assert.equal(revealInvisible(samples.hangulFillerIdentifier), 'const <U+3164> = 1;');
 });
 
 test('bidi overrides and isolates are reported as runs', () => {
@@ -143,6 +164,19 @@ test('severities per kind', () => {
   assert.equal(severity('x\u202Ey'), 'high');
   assert.equal(severity('p\u0430ypal'), 'medium');
   assert.equal(severity('x\u{E0001}\u{E007F}'), 'high');
+});
+
+test('evidence stays small for very long hidden payloads', () => {
+  const payload = 'A'.repeat(50_000);
+  const [hit] = detectUnicode(`x${samples.toTags(payload)}y`);
+  assert.equal(hit?.decoded, payload, 'the hit keeps the full decoded text');
+  const [finding] = unicodeFindings(`x${samples.toTags(payload)}y`);
+  assert.ok(finding!.evidence.excerpt.length < 300, `excerpt is ${finding!.evidence.excerpt.length} characters`);
+  assert.match(finding!.evidence.excerpt, /^x(<U\+E0041>){20}…y$/);
+  assert.ok(finding!.message.length < 400, `message is ${finding!.message.length} characters`);
+  assert.match(finding!.message, /… \(50000 characters in all\)$/);
+  // A short payload is quoted whole, with no truncation note.
+  assert.doesNotMatch(unicodeFindings(samples.tagPayload)[0]!.message, /characters in all/);
 });
 
 test('findings without a path leave it out, and excerpts never split surrogate pairs', () => {
